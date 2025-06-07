@@ -1,0 +1,18 @@
+// Define the time range for the search
+let startTime = ago(1d);
+let endTime = now();
+
+// Search for failed login attempts
+SecurityEvent
+| where TimeGenerated between (startTime .. endTime)
+| where EventID == 4625 // Event ID for failed logins
+| where AccountType == "User" // Filter out system accounts
+| summarize FailedLogins = count() by IPAddress, Account, UserID
+| where FailedLogins > 5 // Set the threshold for failed login attempts
+// Identify consecutive failed login attempts from the same IP address
+| extend ConsecutiveFailures = row_cumsum(FailedLogins, IPAddress != prev(IPAddress) or Account != prev(Account) or UserID != prev(UserID))
+| where ConsecutiveFailures >= 5 // Set the threshold for consecutive failed attempts
+// Filter out known IP addresses (optional)
+| where not (IPAddress in ("127.0.0.1", "localhost", "x.x.x.x")) // Add known IP addresses to exclude
+// Output the results
+| project IPAddress, Account, UserID, ConsecutiveFailures

@@ -1,0 +1,8 @@
+DeviceLogonEvents
+| where Timestamp between (ago(1.5h) .. now())    // Adjust timeframe as desired
+| where LogonType == "Interactive" or LogonType == "RemoteInteractive"
+| where ActionType == "LogonFailed"
+| summarize FailedLogins = count() by RemoteIP, AccountName, DeviceName, LogonType
+| where FailedLogins > 5
+| where not(RemoteIP in~ ("127.0.0.1", "::1", "localhost", "x.x.x.x"))  // Exclude known IPs and localhost
+| project Timestamp=now(), RemoteIP, AccountName, DeviceName, LogonType, FailedLogins
