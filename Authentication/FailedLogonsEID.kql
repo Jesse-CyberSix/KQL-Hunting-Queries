@@ -1,18 +1,24 @@
+// Uses the Event ID syntax to hunt for failed logon events
 // Define the time range for the search
 let startTime = ago(1d);
 let endTime = now();
-
 // Search for failed login attempts
 SecurityEvent
 | where TimeGenerated between (startTime .. endTime)
 | where EventID == 4625 // Event ID for failed logins
 | where AccountType == "User" // Filter out system accounts
-| summarize FailedLogins = count() by IPAddress, Account, UserID
+// Options for LogonType:
+// 2 – Interactive 3 – Network 4 – Batch 5 – Service 7 – Unlock 
+// 8 – NetworkCleartext 9 – NewCredentials 10 – RemoteInteractive
+// 11 – CachedInteractive 12 – CachedRemoteInteractive 13 – CachedUnlock
+| extend LogonType = tostring(parse_json(AdditionalFields)["LogonType"])
+| summarize FailedLogins = count() by IPAddress, Account, UserID, LogonType
 | where FailedLogins > 5 // Set the threshold for failed login attempts
 // Identify consecutive failed login attempts from the same IP address
 | extend ConsecutiveFailures = row_cumsum(FailedLogins, IPAddress != prev(IPAddress) or Account != prev(Account) or UserID != prev(UserID))
-| where ConsecutiveFailures >= 5 // Set the threshold for consecutive failed attempts
+// Filter for high-frequency consecutive failures
+| where ConsecutiveFailures >= 5
 // Filter out known IP addresses (optional)
 | where not (IPAddress in ("127.0.0.1", "localhost", "x.x.x.x")) // Add known IP addresses to exclude
 // Output the results
-| project IPAddress, Account, UserID, ConsecutiveFailures
+| project IPAddress, Account, UserID, LogonType, ConsecutiveFailures

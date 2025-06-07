@@ -1,5 +1,7 @@
+// Uses Defender syntax to hunt for failed logon events
 DeviceLogonEvents
 | where Timestamp between (ago(1.5h) .. now())    // Adjust timeframe as desired
+// Available options for LogonType: Interactive RemoteInteractive Network Batch Service
 | where LogonType == "Interactive" or LogonType == "RemoteInteractive"
 | where ActionType == "LogonFailed"
 | summarize FailedLogins = count() by RemoteIP, AccountName, DeviceName, LogonType
