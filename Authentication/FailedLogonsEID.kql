@@ -22,3 +22,13 @@ SecurityEvent
 | where not (IPAddress in ("127.0.0.1", "localhost", "x.x.x.x")) // Add known IP addresses to exclude
 // Output the results
 | project IPAddress, Account, UserID, LogonType, ConsecutiveFailures
+
+
+SecurityEvent
+| where TimeGenerated between (startTime .. endTime)
+| where EventID == 4625
+| where AccountType == "User"
+| summarize FailedLogins = count() by IPAddress, Account, TargetUserName, LogonType
+| where FailedLogins > 5
+| where not(IPAddress in ("127.0.0.1", "localhost", "x.x.x.x"))
+| project IPAddress, Account, TargetUserName, LogonType, FailedLogins
