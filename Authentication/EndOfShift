@@ -1,0 +1,27 @@
+// Define shift start and end times (adjust as needed)
+let shiftStart = datetime(2025-06-08 22:00:00); // Example: 10 PM
+let shiftEnd = datetime(2025-06-09 06:00:00);   // Example: 6 AM next day
+
+SecurityIncident
+| where TimeGenerated between (shiftStart .. shiftEnd)
+
+// Get the earliest record per incident
+| summarize FirstSeen = arg_min(TimeGenerated, Title, Status, Owner, ProviderIncidentId) by ProviderIncidentId
+
+// Normalize analyst field
+| extend Analyst = tolower(coalesce(Owner.assignedTo, tostring(Owner)))
+
+// Create a simplified incident summary
+| extend IncidentSummary = bag_pack(
+    "IncidentID", ProviderIncidentId,
+    "Title", Title,
+    "Status", Status,
+    "Analyst", Analyst,
+    "FirstSeen", FirstSeen
+)
+
+// Aggregate by Title (or change to Analyst if needed)
+| summarize TotalIncidents = count(), Incidents = make_list(IncidentSummary) by Title
+
+// Show top 20 incident types by volume
+| top 20 by TotalIncidents
