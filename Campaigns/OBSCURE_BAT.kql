@@ -138,17 +138,19 @@ let SHA256_IOCs = dynamic(['E33E05D3182F46F65554FDA2127D9D1D415A986B6C635485B323
 '0ABECC48522A2AA66C798E817F0412DC71DF2875B8908255208642FE019AB9D3',
 '1BAD202E452B1D1F8B365E946C446F889B2479A6198A17A3DEA1D6A4E5D12052',
 '8004DF38975733770A7E2A0C71D284BC3439EB7EE74077F950AD7C0BAF2512AA']);
+
 let url_matches = DeviceNetworkEvents
-     | extend NormalizedUrl = tolower(RemoteUrl)
-     | where NormalizedUrl has_any (tolower(URL_IOCs))
-     | project Timestamp, DeviceName, ReportId, RemoteUrl, InitiatingProcessFileName, InitiatingProcessCommandLine, IOCType = "URL", IOCValue = RemoteUrl;
+    | where RemoteUrl has_any (iocs | where IOCType == "URL" | project IOCValue)
+    | project Timestamp, DeviceName, IOCType = "URL", IOCValue = RemoteUrl;
+
 let ip_matches = DeviceNetworkEvents
-     | extend NormalizedIP = tolower(RemoteIP)
-     | where NormalizedIP in (tolower(IP_IOCs))
-     | project Timestamp, DeviceName, ReportId, RemoteIP, InitiatingProcessFileName, InitiatingProcessCommandLine, IOCType = "IP", IOCValue = RemoteIP;
+    | where RemoteIP in (iocs | where IOCType == "IP" | project IOCValue)
+    | project Timestamp, DeviceName, IOCType = "IP", IOCValue = RemoteIP;
+
 let hash_matches = DeviceFileEvents
-     | extend NormalizedHash = tolower(SHA256)
-     | where NormalizedHash in (tolower(SHA256_IOCs))
-     | project Timestamp, DeviceName, ReportId, FileName, FolderPath, InitiatingProcessFileName, InitiatingProcessCommandLine, IOCType = "Hash", IOCValue = SHA256;
+    | where SHA256 in (iocs | where IOCType == "Hash" | project IOCValue)
+    | project Timestamp, DeviceName, IOCType = "Hash", IOCValue = SHA256;
+
 union url_matches, ip_matches, hash_matches
-| order by Timestamp desc
+| summarize IOCCount = dcount(IOCValue), IOCs = make_set(IOCValue) by DeviceName, bin(Timestamp, 1h)
+| where IOCCount >= 2
